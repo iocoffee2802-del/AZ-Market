@@ -1,10 +1,33 @@
 # Supabase setup
 
-1. Create a Supabase project.
-2. Open SQL Editor and run `migrations/0001_init.sql`.
-3. Configure Auth email provider and redirect URLs for your deployed site.
-4. Create the first user account, then promote it to admin in SQL Editor:
-   `update public.profiles set role = 'admin' where id = '<AUTH_USER_UUID>';`
-5. Add the Supabase URL and anon key to deployment environment variables.
+## Fresh development project
 
-New products are inserted with status `pending`. Public catalog queries must filter to `status = 'active'`. Only admins can approve or reject products. Review and test all policies in a staging project before production.
+1. In Supabase Dashboard, open **SQL Editor**.
+2. Run `migrations/0001_init.sql` first.
+3. Run `migrations/0002_profile_bootstrap.sql` second.
+4. In **Authentication → Providers**, enable Email/password.
+5. In **Authentication → URL Configuration**, set the local Site URL to `http://localhost:3000` and add `http://localhost:3000/**` to Redirect URLs.
+6. In **Project Settings → API**, copy the Project URL and the publishable key (or legacy anon key) into the local `.env.local` file. Never use the service_role/secret key in the browser or commit it to GitHub.
+
+## First administrator
+
+1. Register your own account through the AZ MARKET website.
+2. In **Authentication → Users**, copy that user's UUID.
+3. In SQL Editor, run the following after replacing the placeholder with the verified UUID:
+
+```sql
+update public.profiles
+set role = 'admin'
+where id = '<AUTH_USER_UUID>';
+```
+
+Do not expose an admin-role selector in public registration. Keep the first admin promotion as a manual, controlled operation.
+
+## Security notes
+
+- Both migrations enable Row Level Security on marketplace tables.
+- New registrations are assigned the `buyer` role by the database trigger.
+- Sellers may only submit products for stores they own; submitted products start as `pending`.
+- Public product visibility requires an approved product and an active store.
+- Only admins can review products and seller applications.
+- Test policies using separate buyer, seller, and admin accounts before real sales.
