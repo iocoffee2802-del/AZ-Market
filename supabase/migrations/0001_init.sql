@@ -41,7 +41,28 @@ create index if not exists products_status_created_idx on public.products(status
 create index if not exists products_store_idx on public.products(store_id);
 create or replace function public.current_user_role()
 returns public.account_role language sql stable security definer set search_path = public
-as $$ select role from public.profiles where id = auth.uid() $$;
+as $ select role from public.profiles where id = auth.uid() $;
+
+-- Sellers may edit store details but cannot activate/suspend a store or transfer ownership.
+create or replace function public.guard_store_sensitive_fields()
+returns trigger
+language plpgsql
+set search_path = public
+as $
+begin
+  if auth.uid() is not null
+     and public.current_user_role() <> 'admin'
+     and (new.status is distinct from old.status or new.owner_id is distinct from old.owner_id) then
+    raise exception 'Only an administrator can change store status or ownership';
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists guard_store_sensitive_fields_trigger on public.stores;
+create trigger guard_store_sensitive_fields_trigger
+  before update on public.stores
+  for each row execute procedure public.guard_store_sensitive_fields();
 alter table public.profiles enable row level security;
 alter table public.stores enable row level security;
 alter table public.products enable row level security;
