@@ -47,8 +47,6 @@ alter table public.stores enable row level security;
 alter table public.products enable row level security;
 drop policy if exists "profile read self" on public.profiles;
 create policy "profile read self" on public.profiles for select to authenticated using (id = auth.uid() or public.current_user_role() = 'admin');
-drop policy if exists "profile update self safe" on public.profiles;
-create policy "profile update self safe" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid() and role = (select p.role from public.profiles p where p.id = auth.uid()));
 drop policy if exists "stores visible" on public.stores;
 create policy "stores visible" on public.stores for select using (status = 'active' or owner_id = auth.uid() or public.current_user_role() = 'admin');
 drop policy if exists "seller creates store" on public.stores;
@@ -56,7 +54,11 @@ create policy "seller creates store" on public.stores for insert to authenticate
 drop policy if exists "owner updates store" on public.stores;
 create policy "owner updates store" on public.stores for update to authenticated using (owner_id = auth.uid() or public.current_user_role() = 'admin') with check (owner_id = auth.uid() or public.current_user_role() = 'admin');
 drop policy if exists "public sees approved products" on public.products;
-create policy "public sees approved products" on public.products for select using (status = 'active' or exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid()) or public.current_user_role() = 'admin');
+create policy "public sees approved products" on public.products for select using (
+  (status = 'active' and exists (select 1 from public.stores s where s.id = store_id and s.status = 'active'))
+  or exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  or public.current_user_role() = 'admin'
+);
 drop policy if exists "seller submits pending product" on public.products;
 create policy "seller submits pending product" on public.products for insert to authenticated with check (
  status = 'pending' and exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid() and s.status = 'active')
